@@ -9,6 +9,7 @@ class MarkovModel:
         curr:str = ""
         sequences:list = [] 
         curr = os.getcwd()
+        # for debugging add /virtualEnvironment/src/
         os.chdir(str(curr) + "/fasta/")
         curr = os.getcwd()
         listOfFastaFiles:list = [] 
@@ -39,6 +40,12 @@ class MarkovModel:
             "C":0.0,
             "G":0.0
         }
+        nucleotidesProbabilityNew = {
+            "A":0.0,
+            "T":0.0,
+            "C":0.0,
+            "G":0.0
+        }
 
         sequenceSize = self.sequenceSize(sequence)
         
@@ -60,10 +67,14 @@ class MarkovModel:
         nucleotidesProbability['C'] = nucleotides['C'] / sequenceSize
         nucleotidesProbability['G'] = nucleotides['G'] / sequenceSize
         
+        nucleotidesProbabilityNew['A'] = (nucleotides['A'] - 1) / (sequenceSize - 1) 
+        nucleotidesProbabilityNew['T'] = (nucleotides['T'] - 1) / (sequenceSize - 1)
+        nucleotidesProbabilityNew['C'] = (nucleotides['C'] - 1) / (sequenceSize - 1)
+        nucleotidesProbabilityNew['G'] = (nucleotides['G'] - 1) / (sequenceSize - 1)
 
-        return (nucleotides, nucleotidesProbability)
+        return (nucleotides, nucleotidesProbability, nucleotidesProbabilityNew)
 
-    def pairAlphabetFrequency(self, sequence:str):
+    def observedPairAlphabetFrequency(self, sequence:str):
 
         pairNucleotides = {
             'AA':0,
@@ -107,23 +118,52 @@ class MarkovModel:
         sequencePairsSize = self.sequencePairSize(sequenceSize)
         patterns= ['AA','AC','AG','AT','CA','CC','CG','CT','GA','GC','GG','GT','TA','TC','TG','TT']
         pairNucleotides = self.countPattern(pairNucleotides, sequence, patterns)
-        pairNucleotidesPossibility = self.calculateProbabilityOfEachPattern(pairNucleotides, sequencePairsSize)
-        print(pairNucleotidesPossibility)
+        ObservedPairNucleotidesPossibility = self.calculateObservedProbabilityOfEachPattern(pairNucleotides, sequencePairsSize)
+        return ObservedPairNucleotidesPossibility
 
     def countPattern(self, pairNucleotides: dict, sequence:str, patterns:list):
         for eachPattern in patterns:
             pairNucleotides[eachPattern] = sequence.count(eachPattern)
         return pairNucleotides
 
-    def calculateProbabilityOfEachPattern(self, pairNucleotides:dict, sequencePairsSize:int):
+    def calculateObservedProbabilityOfEachPattern(self, pairNucleotides:dict, sequencePairsSize:int):
         for keys in pairNucleotides:
             pairNucleotides[keys] /= sequencePairsSize
         return pairNucleotides
 
+    def calculateExpectedProbabilityOfEachPattern(self, nucleotideProbability:dict, observedPairAlphabetProbability:dict, pattern:list):
+        # P(A|A) = p(AA)/p(A)
+        expectedPairNucleotidesProbability = {
+            'AA':0.0,
+            'AC':0.0,
+            'AG':0.0,
+            'AT':0.0,
+            'CA':0.0,
+            'CC':0.0,
+            'CG':0.0,
+            'CT':0.0,
+            'GA':0.0,
+            'GC':0.0,
+            'GG':0.0,
+            'GT':0.0,
+            'TA':0.0,
+            'TC':0.0,
+            'TG':0.0,
+            'TT':0.0
+        }
+
+        for eachPattern in pattern:
+            # P(C|A) = P(AC)/P(A)
+            # 'AA','AC','AG','AT','CA','CC','CG','CT','GA','GC','GG','GT','TA','TC','TG','TT'
+            denominatorPattern = eachPattern[0]
+            expectedPairNucleotidesProbability[eachPattern] = observedPairAlphabetProbability[eachPattern] / nucleotideProbability[denominatorPattern]
+
+        return expectedPairNucleotidesProbability
+
     def sequenceSize(self, sequence:str):
         sequenceSize = len(sequence)        
         return sequenceSize
-  
+    
     def sequencePairSize(self, sequenceSize):
         if sequenceSize%2==0:
             pass
@@ -137,6 +177,17 @@ if __name__ == '__main__':
     tupleData = mm.alaphabetFrequency(sequence)
     nucleotideFrequency = tupleData[0]
     nucleotideProbability = tupleData[1]
-    mm.pairAlphabetFrequency(sequence)
+    # nucleotideProbabilityNew = tupleData[2]
 
-    
+    observedPairAlphabetProbability = mm.observedPairAlphabetFrequency(sequence)
+    patterns = ['AA','AC','AG','AT','CA','CC','CG','CT','GA','GC','GG','GT','TA','TC','TG','TT']
+    expectedPairAlphabetProbability = mm.calculateExpectedProbabilityOfEachPattern(nucleotideProbability, observedPairAlphabetProbability, patterns)
+    fileStream = open(os.getcwd() + "/filestream.txt", 'a', encoding="utf8")
+    fileStream.write(str(observedPairAlphabetProbability))
+    fileStream.write(str(expectedPairAlphabetProbability))
+    fileStream.close()
+    for keys in observedPairAlphabetProbability:
+        print(str(keys) + ":" + str(observedPairAlphabetProbability[keys]))
+    print()
+    for keys in expectedPairAlphabetProbability:
+        print(str(keys) + ":" + str(expectedPairAlphabetProbability[keys]))
